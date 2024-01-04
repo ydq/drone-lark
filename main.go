@@ -18,10 +18,6 @@ type Element struct {
 	Tag      string    `json:"tag,omitempty"`
 	Content  string    `json:"content,omitempty"`
 	Elements []Element `json:"elements,omitempty"`
-	URL      string    `json:"url,omitempty"`
-	Type     string    `json:"type,omitempty"`
-	Text     *Element  `json:"text,omitempty"`
-	Actions  []Element `json:"actions,omitempty"`
 }
 
 type Header struct {
@@ -86,51 +82,65 @@ func main() {
 	var markdown strings.Builder
 
 	if os.Getenv("DRONE_FAILED_STEPS") != "" {
-		markdown.WriteString("**🙅🏻‍♂️ 失败：** ")
+		markdown.WriteString("**:SLAP: 失败：** <font color='red'>")
 		markdown.WriteString(os.Getenv("DRONE_FAILED_STEPS"))
-		markdown.WriteString("\n")
+		markdown.WriteString("</font>\n")
 	}
 
-	markdown.WriteString("**📦 项目：** [")
+	markdown.WriteString("**:GeneralBusinessTrip: 项目：** [")
 	markdown.WriteString(repo)
 	markdown.WriteString("](")
 	markdown.WriteString(os.Getenv("DRONE_REPO_LINK"))
 	markdown.WriteString(")\n")
 
 	if os.Getenv("DRONE_REPO_BRANCH") != "" {
-		markdown.WriteString("**🖇️ 分支：** ")
+		markdown.WriteString("**:StatusReading: 分支：** <text_tag color='blue'>")
 		markdown.WriteString(os.Getenv("DRONE_REPO_BRANCH"))
-		markdown.WriteString("\n")
+		markdown.WriteString("</text_tag>\n")
 	}
 
 	if os.Getenv("DRONE_TAG") != "" {
-		markdown.WriteString("**🏷️ 标签：** ")
+		markdown.WriteString("**:Pin: 标签：** <text_tag color='indigo'>")
 		markdown.WriteString(os.Getenv("DRONE_TAG"))
+		markdown.WriteString("</text_tag>\n")
+	}
+
+	author := os.Getenv("DRONE_COMMIT_AUTHOR")
+	authorName := os.Getenv("DRONE_COMMIT_AUTHOR_NAME")
+
+	if author == "" {
+		if authorName != "" {
+			author = authorName
+		}
+	} else if authorName != "" && author != authorName {
+		author = authorName + "@" + author
+	}
+
+	if author != "" {
+		email := os.Getenv("DRONE_COMMIT_AUTHOR_EMAIL")
+		hasEmail := email != ""
+		markdown.WriteString("**:EMBARRASSED: 提交：** ")
+		if hasEmail {
+			markdown.WriteString("[")
+		}
+		markdown.WriteString(author)
+		if hasEmail {
+			markdown.WriteString("](mailto:")
+			markdown.WriteString(email)
+			markdown.WriteString(")")
+		}
 		markdown.WriteString("\n")
 	}
 
-	if os.Getenv("DRONE_COMMIT_AUTHOR") != "" {
-		markdown.WriteString("**👤 提交：** [")
-		hasNick := os.Getenv("DRONE_COMMIT_AUTHOR_NAME") != "" && os.Getenv("DRONE_COMMIT_AUTHOR") != os.Getenv("DRONE_COMMIT_AUTHOR_NAME")
-		if hasNick {
-			markdown.WriteString(os.Getenv("DRONE_COMMIT_AUTHOR_NAME"))
-			markdown.WriteString("@")
-		}
-		markdown.WriteString(os.Getenv("DRONE_COMMIT_AUTHOR"))
-		markdown.WriteString("](mailto:")
-		markdown.WriteString(os.Getenv("DRONE_COMMIT_AUTHOR_EMAIL"))
-		markdown.WriteString(")\n")
-	}
-
 	if os.Getenv("DRONE_COMMIT_SHA") != "" {
-		markdown.WriteString("**📝 信息：** [#")
+		markdown.WriteString("**:Status_PrivateMessage: 信息：** [#")
 		markdown.WriteString(os.Getenv("DRONE_COMMIT_SHA")[:8])
 		markdown.WriteString("](")
 		markdown.WriteString(os.Getenv("DRONE_COMMIT_LINK"))
 		markdown.WriteString(")\n")
 	}
 
-	markdown.WriteString("\n---\n")
+	markdown.WriteString(" ---\n")
 	markdown.WriteString(os.Getenv("DRONE_COMMIT_MESSAGE"))
 
 	elements := []Element{
@@ -139,28 +149,11 @@ func main() {
 			Content: markdown.String(),
 		},
 		{
-			Tag: "action",
-			Actions: []Element{
-				{
-					Tag:  "button",
-					Type: "primary",
-					URL:  os.Getenv("DRONE_BUILD_LINK"),
-					Text: &Element{
-						Tag:     "plain_text",
-						Content: "去 Drone 查看本次构建详情",
-					},
-				},
-			},
-		},
-		// {
-		// 	Tag: "hr",
-		// },
-		{
 			Tag: "note",
 			Elements: []Element{
 				{
-					Tag:     "plain_text",
-					Content: "🪧 以上信息由 drone 飞书机器人自动发出",
+					Tag:     "lark_md",
+					Content: ":Loudspeaker: [以上信息由 drone 飞书机器人自动发出](" + os.Getenv("DRONE_BUILD_LINK") + ")",
 				},
 			},
 		},
@@ -195,7 +188,10 @@ func sendRequest(url string, body Body) error {
 	if err != nil {
 		return err
 	}
-	// fmt.Println(string(jsonBody))
+	debug := os.Getenv("PLUGIN_DEBUG") == "true"
+	if debug {
+		fmt.Println("Request Body:", string(jsonBody))
+	}
 
 	resp, err := http.Post(url, "application/json", bytes.NewBuffer(jsonBody))
 	if err != nil {
@@ -211,6 +207,8 @@ func sendRequest(url string, body Body) error {
 		return err
 	}
 
-	fmt.Println("Response Body:", string(responseBody))
+	if debug {
+		fmt.Println("Response Body:", string(responseBody))
+	}
 	return nil
 }
