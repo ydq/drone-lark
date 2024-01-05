@@ -15,9 +15,10 @@ import (
 )
 
 type Element struct {
-	Tag      string    `json:"tag,omitempty"`
-	Content  string    `json:"content,omitempty"`
-	Elements []Element `json:"elements,omitempty"`
+	Tag      string            `json:"tag,omitempty"`
+	Content  string            `json:"content,omitempty"`
+	Elements []Element         `json:"elements,omitempty"`
+	I18N     map[string]string `json:"i18n,omitempty"`
 }
 
 type Header struct {
@@ -26,8 +27,8 @@ type Header struct {
 }
 
 type Card struct {
-	Elements []Element `json:"elements,omitempty"`
-	Header   Header    `json:"header,omitempty"`
+	I18nElements map[string][]Element `json:"i18n_elements,omitempty"`
+	Header       Header               `json:"header,omitempty"`
 }
 
 type Body struct {
@@ -40,13 +41,13 @@ type Body struct {
 func main() {
 	webhook := os.Getenv("PLUGIN_WEBHOOK")
 	if webhook == "" {
-		fmt.Println("缺少 webhook 配置")
+		fmt.Println("Missing webhook configuration")
 		return
 	}
 
 	secret := os.Getenv("PLUGIN_SECRET")
 	if secret == "" {
-		fmt.Println("缺少 secret 配置")
+		fmt.Println("Missing secret configuration")
 		return
 	}
 
@@ -55,54 +56,75 @@ func main() {
 
 	repo := os.Getenv("DRONE_REPO_NAME")
 
-	var title strings.Builder
 	var color string
+	var cnTitle string
+	var enTitle string
+
+	buildNo := os.Getenv("DRONE_BUILD_NUMBER")
 
 	if os.Getenv("DRONE_BUILD_STATUS") == "success" {
 		color = "green"
-		title.WriteString("✅ ")
-		title.WriteString(repo)
-		title.WriteString(" 构建成功 #")
+		cnTitle = "✅ " + repo + " 构建成功 #" + buildNo
+		enTitle = "✅ " + repo + " Build Successfully #" + buildNo
 	} else {
 		color = "red"
-		title.WriteString("❌ ")
-		title.WriteString(repo)
-		title.WriteString(" 构建失败 #")
+		cnTitle = "❌ " + repo + " 构建失败 #" + buildNo
+		enTitle = "❌ " + repo + " Build Failed #" + buildNo
 	}
-	title.WriteString(os.Getenv("DRONE_BUILD_NUMBER"))
 
 	header := Header{
 		Template: color,
 		Title: Element{
-			Tag:     "plain_text",
-			Content: title.String(),
+			Tag: "plain_text",
+			I18N: map[string]string{
+				"zh_cn": cnTitle,
+				"en_us": enTitle,
+			},
 		},
 	}
 
-	var markdown strings.Builder
+	var cnMarkdown strings.Builder
+	var enMarkdown strings.Builder
 
 	if os.Getenv("DRONE_FAILED_STEPS") != "" {
-		markdown.WriteString("**:SLAP: 失败：** <font color='red'>")
-		markdown.WriteString(os.Getenv("DRONE_FAILED_STEPS"))
-		markdown.WriteString("</font>\n")
+		cnMarkdown.WriteString("**:SLAP: 失败：** <font color='red'>")
+		cnMarkdown.WriteString(os.Getenv("DRONE_FAILED_STEPS"))
+		cnMarkdown.WriteString("</font>\n")
+		enMarkdown.WriteString("**:SLAP: FAIL: ** <font color='red'>")
+		enMarkdown.WriteString(os.Getenv("DRONE_FAILED_STEPS"))
+		enMarkdown.WriteString("</font>\n")
 	}
 
-	markdown.WriteString("**:GeneralBusinessTrip: 项目：** [")
-	markdown.WriteString(repo)
-	markdown.WriteString("](")
-	markdown.WriteString(os.Getenv("DRONE_REPO_LINK"))
-	markdown.WriteString(")\n")
+	cnMarkdown.WriteString("**:GeneralBusinessTrip: 项目：** [")
+	cnMarkdown.WriteString(repo)
+	cnMarkdown.WriteString("](")
+	cnMarkdown.WriteString(os.Getenv("DRONE_REPO_LINK"))
+	cnMarkdown.WriteString(")\n")
+
+	enMarkdown.WriteString("**:GeneralBusinessTrip: PROJ: ** [")
+	enMarkdown.WriteString(repo)
+	enMarkdown.WriteString("](")
+	enMarkdown.WriteString(os.Getenv("DRONE_REPO_LINK"))
+	enMarkdown.WriteString(")\n")
 
 	if os.Getenv("DRONE_REPO_BRANCH") != "" {
-		markdown.WriteString("**:StatusReading: 分支：** <text_tag color='blue'>")
-		markdown.WriteString(os.Getenv("DRONE_REPO_BRANCH"))
-		markdown.WriteString("</text_tag>\n")
+		cnMarkdown.WriteString("**:StatusReading: 分支：** <text_tag color='blue'>")
+		cnMarkdown.WriteString(os.Getenv("DRONE_REPO_BRANCH"))
+		cnMarkdown.WriteString("</text_tag>\n")
+
+		enMarkdown.WriteString("**:StatusReading: BCHS: ** <text_tag color='blue'>")
+		enMarkdown.WriteString(os.Getenv("DRONE_REPO_BRANCH"))
+		enMarkdown.WriteString("</text_tag>\n")
 	}
 
 	if os.Getenv("DRONE_TAG") != "" {
-		markdown.WriteString("**:Pin: 标签：** <text_tag color='indigo'>")
-		markdown.WriteString(os.Getenv("DRONE_TAG"))
-		markdown.WriteString("</text_tag>\n")
+		cnMarkdown.WriteString("**:Pin: 标签：** <text_tag color='indigo'>")
+		cnMarkdown.WriteString(os.Getenv("DRONE_TAG"))
+		cnMarkdown.WriteString("</text_tag>\n")
+
+		enMarkdown.WriteString("**:Pin: TAGS: ** <text_tag color='indigo'>")
+		enMarkdown.WriteString(os.Getenv("DRONE_TAG"))
+		enMarkdown.WriteString("</text_tag>\n")
 	}
 
 	author := os.Getenv("DRONE_COMMIT_AUTHOR")
@@ -119,34 +141,51 @@ func main() {
 	if author != "" {
 		email := os.Getenv("DRONE_COMMIT_AUTHOR_EMAIL")
 		hasEmail := email != ""
-		markdown.WriteString("**:EMBARRASSED: 提交：** ")
+		cnMarkdown.WriteString("**:EMBARRASSED: 提交：** ")
+		enMarkdown.WriteString("**:EMBARRASSED: CMMT: ** ")
 		if hasEmail {
-			markdown.WriteString("[")
+			cnMarkdown.WriteString("[")
+			enMarkdown.WriteString("[")
 		}
-		markdown.WriteString(author)
+		cnMarkdown.WriteString(author)
+		enMarkdown.WriteString(author)
 		if hasEmail {
-			markdown.WriteString("](mailto:")
-			markdown.WriteString(email)
-			markdown.WriteString(")")
+			cnMarkdown.WriteString("](mailto:")
+			cnMarkdown.WriteString(email)
+			cnMarkdown.WriteString(")")
+
+			enMarkdown.WriteString("](mailto:")
+			enMarkdown.WriteString(email)
+			enMarkdown.WriteString(")")
 		}
-		markdown.WriteString("\n")
+		cnMarkdown.WriteString("\n")
+		enMarkdown.WriteString("\n")
 	}
 
 	if os.Getenv("DRONE_COMMIT_SHA") != "" {
-		markdown.WriteString("**:Status_PrivateMessage: 信息：** [#")
-		markdown.WriteString(os.Getenv("DRONE_COMMIT_SHA")[:8])
-		markdown.WriteString("](")
-		markdown.WriteString(os.Getenv("DRONE_COMMIT_LINK"))
-		markdown.WriteString(")\n")
+		cnMarkdown.WriteString("**:Status_PrivateMessage: 信息：** [#")
+		cnMarkdown.WriteString(os.Getenv("DRONE_COMMIT_SHA")[:8])
+		cnMarkdown.WriteString("](")
+		cnMarkdown.WriteString(os.Getenv("DRONE_COMMIT_LINK"))
+		cnMarkdown.WriteString(")\n")
+
+		enMarkdown.WriteString("**:Status_PrivateMessage: NOTE: ** [#")
+		enMarkdown.WriteString(os.Getenv("DRONE_COMMIT_SHA")[:8])
+		enMarkdown.WriteString("](")
+		enMarkdown.WriteString(os.Getenv("DRONE_COMMIT_LINK"))
+		enMarkdown.WriteString(")\n")
 	}
 
-	markdown.WriteString(" ---\n")
-	markdown.WriteString(os.Getenv("DRONE_COMMIT_MESSAGE"))
+	cnMarkdown.WriteString(" ---\n")
+	cnMarkdown.WriteString(os.Getenv("DRONE_COMMIT_MESSAGE"))
 
-	elements := []Element{
+	enMarkdown.WriteString(" ---\n")
+	enMarkdown.WriteString(os.Getenv("DRONE_COMMIT_MESSAGE"))
+
+	cnElements := []Element{
 		{
 			Tag:     "markdown",
-			Content: markdown.String(),
+			Content: cnMarkdown.String(),
 		},
 		{
 			Tag: "note",
@@ -159,13 +198,32 @@ func main() {
 		},
 	}
 
+	enElements := []Element{
+		{
+			Tag:     "markdown",
+			Content: enMarkdown.String(),
+		},
+		{
+			Tag: "note",
+			Elements: []Element{
+				{
+					Tag:     "lark_md",
+					Content: ":Loudspeaker: [This msg is sent by drone lark robot](" + os.Getenv("DRONE_BUILD_LINK") + ")",
+				},
+			},
+		},
+	}
+
 	body := Body{
 		Timestamp: timestamp,
 		Sign:      sign,
 		MsgType:   "interactive",
 		Card: Card{
-			Header:   header,
-			Elements: elements,
+			Header: header,
+			I18nElements: map[string][]Element{
+				"zh_cn": cnElements,
+				"en_us": enElements,
+			},
 		},
 	}
 
