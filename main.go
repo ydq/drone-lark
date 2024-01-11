@@ -107,16 +107,6 @@ func main() {
 	enMarkdown.WriteString(os.Getenv("DRONE_REPO_LINK"))
 	enMarkdown.WriteString(")\n")
 
-	if os.Getenv("DRONE_REPO_BRANCH") != "" {
-		cnMarkdown.WriteString("**:StatusReading: 分支：** <text_tag color='blue'>")
-		cnMarkdown.WriteString(os.Getenv("DRONE_REPO_BRANCH"))
-		cnMarkdown.WriteString("</text_tag>\n")
-
-		enMarkdown.WriteString("**:StatusReading: BCHS: ** <text_tag color='blue'>")
-		enMarkdown.WriteString(os.Getenv("DRONE_REPO_BRANCH"))
-		enMarkdown.WriteString("</text_tag>\n")
-	}
-
 	if os.Getenv("DRONE_TAG") != "" {
 		cnMarkdown.WriteString("**:Pin: 标签：** <text_tag color='indigo'>")
 		cnMarkdown.WriteString(os.Getenv("DRONE_TAG"))
@@ -124,6 +114,16 @@ func main() {
 
 		enMarkdown.WriteString("**:Pin: TAGS: ** <text_tag color='indigo'>")
 		enMarkdown.WriteString(os.Getenv("DRONE_TAG"))
+		enMarkdown.WriteString("</text_tag>\n")
+
+	} else if os.Getenv("DRONE_REPO_BRANCH") != "" {
+
+		cnMarkdown.WriteString("**:StatusReading: 分支：** <text_tag color='blue'>")
+		cnMarkdown.WriteString(os.Getenv("DRONE_REPO_BRANCH"))
+		cnMarkdown.WriteString("</text_tag>\n")
+
+		enMarkdown.WriteString("**:StatusReading: BCHS: ** <text_tag color='blue'>")
+		enMarkdown.WriteString(os.Getenv("DRONE_REPO_BRANCH"))
 		enMarkdown.WriteString("</text_tag>\n")
 	}
 
